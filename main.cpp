@@ -9,6 +9,7 @@
 #include <random>
 #include <numeric>
 #include <variant>
+#include <chrono>
 
 using namespace std;
 
@@ -35,6 +36,8 @@ vector<vector<int>> readKroaFile(const string &filename)
             verticesCoords.push_back({x, y});
         }
 
+        verticesCoords.pop_back();
+        
         file.close();
     }
     else
@@ -569,7 +572,9 @@ void swapVerticesInCycle(int i, int j, Graph &graph, const vector<vector<int>> &
 
 vector<Graph> steepyLocalSearchNeighbourhood1(vector<Graph> &cycles, const vector<vector<int>> &distanceMatrix)
 {
-    for (int i = 0; i < 100; i++)
+    int bestDelta = 0;
+    
+    do
     {
         vector<pair<pair<Vertex *, Vertex *>, Graph *>> moves;
 
@@ -598,7 +603,7 @@ vector<Graph> steepyLocalSearchNeighbourhood1(vector<Graph> &cycles, const vecto
 
         pair<pair<Vertex *, Vertex *>, Graph *> bestMove;
 
-        int bestDelta = 0;
+        bestDelta = 0;
 
         for (auto move : moves)
         {
@@ -659,16 +664,17 @@ vector<Graph> steepyLocalSearchNeighbourhood1(vector<Graph> &cycles, const vecto
                 cycle.normalizeGraph();
             }
         }
-    }
+    } while(bestDelta < 0);
 
     return cycles;
 }
 
 vector<Graph> greedyLocalSearchNeighbourhood1(vector<Graph> &cycles, const vector<vector<int>> &distanceMatrix)
 {
-    for (int i = 0; i < 100; i++)
-    {
+    int delta;
 
+    do
+    {
         vector<pair<pair<Vertex *, Vertex *>, Graph *>> moves;
 
         for (Vertex *vertex1 : cycles[0].vertices)
@@ -701,7 +707,7 @@ vector<Graph> greedyLocalSearchNeighbourhood1(vector<Graph> &cycles, const vecto
             Vertex *vertex2 = move.first.second;
             Graph *graphToSwap = move.second;
 
-            int delta = 0;
+            delta = 0;
 
             if (vertex1->neighbours[0] == vertex2 && vertex2->neighbours[0] == vertex1)
             {
@@ -747,16 +753,17 @@ vector<Graph> greedyLocalSearchNeighbourhood1(vector<Graph> &cycles, const vecto
                 break;
             }
         }
-    }
+    } while(delta < 0);
 
     return cycles;
 }
 
 vector<Graph> steepyLocalSearchNeighbourhood2(vector<Graph> &cycles, const vector<vector<int>> &distanceMatrix)
 {
-    for (int i = 0; i < 100; i++)
-    {
+    int bestDelta = 0;
 
+    do
+    {
         vector<pair<variant<pair<Vertex *, Vertex *>, pair<Edge *, Edge *>>, Graph *>> moves;
 
         for (Vertex *vertex1 : cycles[0].vertices)
@@ -789,7 +796,7 @@ vector<Graph> steepyLocalSearchNeighbourhood2(vector<Graph> &cycles, const vecto
 
         pair<variant<pair<Vertex *, Vertex *>, pair<Edge *, Edge *>>, Graph *> bestMove;
 
-        int bestDelta = 0;
+        bestDelta = 0;
 
         for (auto move : moves)
         {
@@ -857,16 +864,16 @@ vector<Graph> steepyLocalSearchNeighbourhood2(vector<Graph> &cycles, const vecto
                 cycle.normalizeGraph();
             }
         }
-    }
+    }while(bestDelta < 0);
 
     return cycles;
 }
 
 vector<Graph> greedyLocalSearchNeighbourhood2(vector<Graph> &cycles, const vector<vector<int>> &distanceMatrix)
 {
-    for (int i = 0; i < 100; i++)
+    int delta;
+    do
     {
-
         vector<pair<variant<pair<Vertex *, Vertex *>, pair<Edge *, Edge *>>, Graph *>> moves;
 
         for (Vertex *vertex1 : cycles[0].vertices)
@@ -899,7 +906,7 @@ vector<Graph> greedyLocalSearchNeighbourhood2(vector<Graph> &cycles, const vecto
 
         for (auto move : moves)
         {
-            int delta = 0;
+            delta = 0;
 
             if (move.second == nullptr)
             {
@@ -959,7 +966,7 @@ vector<Graph> greedyLocalSearchNeighbourhood2(vector<Graph> &cycles, const vecto
                 break;
             }
         }
-    }
+    } while(delta < 0);
 
     return cycles;
 }
@@ -967,7 +974,7 @@ vector<Graph> greedyLocalSearchNeighbourhood2(vector<Graph> &cycles, const vecto
 vector<Graph> randomWalkNeighbourhood1(vector<Graph> &cycles, const vector<vector<int>> &distanceMatrix)
 {
     vector<Graph> bestCycles = cycles;
-    for (int i = 0; i < 100; i++)
+    for (int i = 0; i < 350; i++)
     {
         vector<pair<pair<Vertex *, Vertex *>, Graph *>> moves;
 
@@ -1027,7 +1034,7 @@ vector<Graph> randomWalkNeighbourhood1(vector<Graph> &cycles, const vector<vecto
 vector<Graph> randomWalkNeighbourhood2(vector<Graph> &cycles, const vector<vector<int>> &distanceMatrix)
 {
     vector<Graph> bestCycles = cycles;
-    for (int i = 0; i < 100; i++)
+    for (int i = 0; i < 350; i++)
     {
         vector<pair<variant<pair<Vertex *, Vertex *>, pair<Edge *, Edge *>>, Graph *>> moves;
 
@@ -1101,61 +1108,129 @@ vector<Graph> randomWalkNeighbourhood2(vector<Graph> &cycles, const vector<vecto
     return bestCycles;
 }
 
-
 int main()
 {
-    vector<vector<int>> verticesCoords = readKroaFile("kroA100.tsp");
+    vector<vector<int>> verticesCoords = readKroaFile("kroB100.tsp");
 
     vector<vector<int>> distanceMatrix = createDistanceMatrix(verticesCoords);
 
     // srand(time(NULL));
 
-    vector<Graph> randomCyclesStart = randomCycles(distanceMatrix);
-    cout << "Random cycles distance: " << randomCyclesStart[0].distance + randomCyclesStart[1].distance << endl;
+    pair<int, int> bestRandomValue = {INT_MAX, -1};
+    pair<int, int> bestGreedyValue = {INT_MAX, -1};
 
-    vector<Graph> greedyCyclesStart = greedyCycles(distanceMatrix, 62);
-    cout << "Greedy cycles distance: " << greedyCyclesStart[0].distance + greedyCyclesStart[1].distance << endl;
+    pair<int, int> worstRandomValue = {-1, -1};
+    pair<int, int> worstGreedyValue = {-1, -1};
+
+    long averageRandomValue = 0;
+    long averageGreedyValue = 0;
+
+    pair<int, int> bestRandomTime = {INT_MAX, -1};
+    pair<int, int> bestGreedyTime = {INT_MAX, -1};
+
+    pair<int, int> worstRandomTime = {-1, -1};
+    pair<int, int> worstGreedyTime = {-1, -1};
+
+    long averageRandomTime = 0;
+    long averageGreedyTime = 0;
+
+    vector<Graph> bestRandomCyclesResult;
+    vector<Graph> bestGreedyCyclesResult;
+
+    for(int i = 0; i < 100; i++){
+
+        chrono::steady_clock::time_point beginRandomCycles = chrono::steady_clock::now();
+
+        vector<Graph> randomCyclesStart = randomCycles(distanceMatrix);
+
+        vector<Graph> randomCyclesResult = randomWalkNeighbourhood2(randomCyclesStart, distanceMatrix);
+
+        chrono::steady_clock::time_point endRandomCycles = chrono::steady_clock::now();
+
+        // for(Edge *e : randomCyclesResult[0].edges){
+        //     cout << e->src->id << " " << e->dest->id << endl;
+        // }
+
+        int elapsedRandomCycles = chrono::duration_cast<chrono::milliseconds>(endRandomCycles - beginRandomCycles).count();
+
+
+        if(randomCyclesResult[0].distance + randomCyclesResult[1].distance < bestRandomValue.first){
+            bestRandomValue = {randomCyclesResult[0].distance + randomCyclesResult[1].distance, i};
+            bestRandomCyclesResult = randomCyclesResult;
+        }
+
+        if(randomCyclesResult[0].distance + randomCyclesResult[1].distance > worstRandomValue.first){
+            worstRandomValue = {randomCyclesResult[0].distance + randomCyclesResult[1].distance, i};
+        }
+
+        averageRandomValue += randomCyclesResult[0].distance + randomCyclesResult[1].distance;
+
+        if(elapsedRandomCycles > worstRandomTime.first){
+            worstRandomTime = {elapsedRandomCycles, i};
+        }
+
+        if(elapsedRandomCycles < bestRandomTime.first){
+            bestRandomTime = {elapsedRandomCycles, i};
+        }
+
+        averageRandomTime += elapsedRandomCycles;
 
 
 
-    // vector<Graph> steepyLocalSearchNeighbourhood1CyclesRandom = steepyLocalSearchNeighbourhood1(randomCyclesStart, distanceMatrix);
-    // cout << "Steepy local search neighbourhood1 on random cycles distance: " << steepyLocalSearchNeighbourhood1CyclesRandom[0].distance + steepyLocalSearchNeighbourhood1CyclesRandom[1].distance << endl;
 
-    // vector<Graph> greedyLocalSearchNeighbourhood1CyclesRandom = greedyLocalSearchNeighbourhood1(randomCyclesStart, distanceMatrix);
-    // cout << "Greedy local search neighbourhood1 on random cycles distance: " << greedyLocalSearchNeighbourhood1CyclesRandom[0].distance + greedyLocalSearchNeighbourhood1CyclesRandom[1].distance << endl;
+        chrono::steady_clock::time_point beginGreedyCycles = chrono::steady_clock::now();
 
-    // vector<Graph> steepyLocalSearchNeighbourhood1CyclesGreedy = steepyLocalSearchNeighbourhood1(greedyCyclesStart, distanceMatrix);
-    // cout << "Steepy local search neighbourhood1 on greedy cycles distance: " << steepyLocalSearchNeighbourhood1CyclesGreedy[0].distance + steepyLocalSearchNeighbourhood1CyclesGreedy[1].distance << endl;
+        vector<Graph> greedyCyclesStart = greedyCycles(distanceMatrix, i);
 
-    // vector<Graph> greedyLocalSearchNeighbourhood1CyclesGreedy = greedyLocalSearchNeighbourhood1(greedyCyclesStart, distanceMatrix);
-    // cout << "Greedy local search neighbourhood1 on greedy cycles distance: " << greedyLocalSearchNeighbourhood1CyclesGreedy[0].distance + greedyLocalSearchNeighbourhood1CyclesGreedy[1].distance << endl;
+        vector<Graph> greedyCyclesResult = randomWalkNeighbourhood2(greedyCyclesStart, distanceMatrix);
 
+        chrono::steady_clock::time_point endGreedyCycles = chrono::steady_clock::now();
+
+        int elapsedGreedyCycles = chrono::duration_cast<chrono::milliseconds>(endGreedyCycles - beginGreedyCycles).count();
 
 
-    // vector<Graph> steepyLocalSearchNeighbourhood2CyclesRandom = steepyLocalSearchNeighbourhood2(randomCyclesStart, distanceMatrix);
-    // cout << "Steepy local search neighbourhood2 on random cycles distance: " << steepyLocalSearchNeighbourhood2CyclesRandom[0].distance + steepyLocalSearchNeighbourhood2CyclesRandom[1].distance << endl;
+        if(greedyCyclesResult[0].distance + greedyCyclesResult[1].distance < bestGreedyValue.first){
+            bestGreedyValue = {greedyCyclesResult[0].distance + greedyCyclesResult[1].distance, i};
+            bestGreedyCyclesResult = greedyCyclesResult;
+        }
 
-    // vector<Graph> greedyLocalSearchNeighbourhood2CyclesRandom = greedyLocalSearchNeighbourhood2(randomCyclesStart, distanceMatrix);
-    // cout << "Greedy local search neighbourhood2 on random cycles distance: " << greedyLocalSearchNeighbourhood2CyclesRandom[0].distance + greedyLocalSearchNeighbourhood2CyclesRandom[1].distance << endl;
+        if(greedyCyclesResult[0].distance + greedyCyclesResult[1].distance > worstGreedyValue.first){
+            worstGreedyValue = {greedyCyclesResult[0].distance + greedyCyclesResult[1].distance, i};
+        }
 
-    // vector<Graph> steepyLocalSearchNeighbourhood2CyclesGreedy = steepyLocalSearchNeighbourhood2(greedyCyclesStart, distanceMatrix);
-    // cout << "Steepy local search neighbourhood2 on greedy cycles distance: " << steepyLocalSearchNeighbourhood2CyclesGreedy[0].distance + steepyLocalSearchNeighbourhood2CyclesGreedy[1].distance << endl;
+        averageGreedyValue += greedyCyclesResult[0].distance + greedyCyclesResult[1].distance;
 
-    // vector<Graph> greedyLocalSearchNeighbourhood2CyclesGreedy = greedyLocalSearchNeighbourhood2(greedyCyclesStart, distanceMatrix);
-    // cout << "Greedy local search neighbourhood2 on greedy cycles distance: " << greedyLocalSearchNeighbourhood2CyclesGreedy[0].distance + greedyLocalSearchNeighbourhood2CyclesGreedy[1].distance << endl;
+        if(elapsedGreedyCycles > worstGreedyTime.first){
+            worstGreedyTime = {elapsedGreedyCycles, i};
+        }
 
+        if(elapsedGreedyCycles < bestGreedyTime.first){
+            bestGreedyTime = {elapsedGreedyCycles, i};
+        }
 
+        averageGreedyTime += elapsedGreedyCycles;
 
-    // vector<Graph> randomWalkNeighbourhood1CyclesRandom = randomWalkNeighbourhood1(randomCyclesStart, distanceMatrix);
-    // cout << "Random walk neighbourhood1 on random cycles distance: " << randomWalkNeighbourhood1CyclesRandom[0].distance + randomWalkNeighbourhood1CyclesRandom[1].distance << endl;
-    
-    // vector<Graph> randomWalkNeighbourhood2CyclesRandom = randomWalkNeighbourhood2(randomCyclesStart, distanceMatrix);
-    // cout << "Random walk neighbourhood2 on random cycles distance: " << randomWalkNeighbourhood2CyclesRandom[0].distance + randomWalkNeighbourhood2CyclesRandom[1].distance << endl;
+        cout << i << endl;
+    }
 
-    // vector<Graph> randomWalkNeighbourhood1CyclesGreedy = randomWalkNeighbourhood1(greedyCyclesStart, distanceMatrix);
-    // cout << "Random walk neighbourhood1 on greedy cycles distance: " << randomWalkNeighbourhood1CyclesGreedy[0].distance + randomWalkNeighbourhood1CyclesGreedy[1].distance << endl;    
+    averageRandomValue /= 100;
+    averageGreedyValue /= 100;
 
-    vector<Graph> randomWalkNeighbourhood2CyclesGreedy = randomWalkNeighbourhood2(greedyCyclesStart, distanceMatrix);
-    cout << "Random walk neighbourhood2 on greedy cycles distance: " << randomWalkNeighbourhood2CyclesGreedy[0].distance + randomWalkNeighbourhood2CyclesGreedy[1].distance << endl;
+    averageRandomTime /= 100;
+    averageGreedyTime /= 100;
+
+    cout << "greedyLocalSearchNeighbourhood2" << endl;
+
+    cout << "RandomCycles" << endl;
+    cout << averageRandomValue << " (" << bestRandomValue.first << " – " << worstRandomValue.first << ")" << endl;
+    cout << averageRandomTime << " (" << bestRandomTime.first << " – " << worstRandomTime.first << ")" << endl;
+
+    cout << "GreedyCycles" << endl;
+    cout << averageGreedyValue << " (" << bestGreedyValue.first << " – " << worstGreedyValue.first << ")" << endl;
+    cout << averageGreedyTime << " (" << bestGreedyTime.first << " – " << worstGreedyTime.first << ")" << endl;
+
+    saveGraphs(bestRandomCyclesResult, "randomWalkNeighbourhood2RandomCyclesB.txt");
+    saveGraphs(bestGreedyCyclesResult, "randomWalkNeighbourhood2GreedyCyclesB.txt");
+
     return 0;
 }
