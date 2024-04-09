@@ -74,9 +74,10 @@ class Vertex
 {
 public:
     int id;
-    vector<Vertex *> neighbours;
+    Vertex* prev;
+    Vertex* next;
 
-    Vertex(int _id) : id(_id) {}
+    Vertex(int _id) : id(_id), prev(nullptr), next(nullptr) {}
 };
 
 class Edge
@@ -87,6 +88,10 @@ public:
     int distance;
 
     Edge(Vertex *_src, Vertex *_dest, int _distance) : src(_src), dest(_dest), distance(_distance) {}
+
+    void remove(){
+        delete this;
+    }
 };
 
 class Graph
@@ -109,21 +114,26 @@ public:
 
     void addEdge(Vertex *src, Vertex *dest, int distance = 0)
     {
+        try{
         if (src && dest && src != dest)
-        {
-            for (Edge *e : edges)
             {
-                if ((e->src == src && e->dest == dest) || (e->src == dest && e->dest == src))
+                for (Edge *e : edges)
                 {
-                    return;
+                    if ((e->src == src && e->dest == dest) || (e->src == dest && e->dest == src))
+                    {
+                        return;
+                    }
                 }
-            }
 
-            Edge *e = new Edge(src, dest, distance);
-            src->neighbours.push_back(dest);
-            dest->neighbours.push_back(src);
-            this->distance += distance;
-            edges.push_back(e);
+                Edge *e = new Edge(src, dest, distance);
+                src->next = dest;
+                dest->prev = src;
+                this->distance += distance;
+                edges.push_back(e);
+            }
+        }
+        catch(exception &e){
+            cout << e.what() << endl;
         }
     }
 
@@ -131,95 +141,29 @@ public:
     {
         if (v)
         {
+            removeEdge(v->prev, v);
+            removeEdge(v, v->next);
+
             vertices.erase(remove(vertices.begin(), vertices.end(), v), vertices.end());
-            for (Vertex *neighbour : v->neighbours)
-            {
-                neighbour->neighbours.erase(remove(neighbour->neighbours.begin(), neighbour->neighbours.end(), v), neighbour->neighbours.end());
-            }
-            for (Edge *e : edges)
-            {
-                if (e->src == v || e->dest == v)
-                {
-                    removeEdge(e->src, e->dest);
-                }
-            }
         }
     }
-
-    void normalizeEdges()
-    {
-        for (Edge *e1 : edges)
-        {
-            for (Edge *e2 : edges)
-            {
-                if (e1 != e2)
-                {
-                    if (e1->src == e2->src || e1->dest == e2->dest)
-                    {
-                        swap(e2->dest, e2->src);
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    void normalizeVertices()
-    {
-        for (Vertex *v : vertices)
-        {
-            for (Edge *e : edges)
-            {
-                if (e->src == v)
-                {
-                    if (v->neighbours[1] != e->dest)
-                    {
-                        swap(v->neighbours[0], v->neighbours[1]);
-                    }
-                }
-            }
-        }
-    }
-
-    void normalizeGraph()
-    {
-        normalizeEdges();
-        normalizeEdges();
-        normalizeVertices();
-    }
-
-    // void removeEdge(Vertex *src, Vertex *dest)
-    // {
-    //     if (src && dest)
-    //     {
-    //         src->neighbours.erase(remove(src->neighbours.begin(), src->neighbours.end(), dest), src->neighbours.end());
-    //         dest->neighbours.erase(remove(dest->neighbours.begin(), dest->neighbours.end(), src), dest->neighbours.end());
-    //         for (Edge *e : edges)
-    //         {
-    //             if ((e->src == src && e->dest == dest) || (e->src == dest && e->dest == src))
-    //             {
-    //                 edges.erase(remove(edges.begin(), edges.end(), e), edges.end());
-    //                 this->distance -= e->distance;
-    //                 break;
-    //             }
-    //         }
-    //     }
-    // }
 
     void removeEdge(Vertex *src, Vertex *dest)
     {
         if (src && dest)
         {
-            src->neighbours.erase(remove(src->neighbours.begin(), src->neighbours.end(), dest), src->neighbours.end());
-            dest->neighbours.erase(remove(dest->neighbours.begin(), dest->neighbours.end(), src), dest->neighbours.end());
             for (Edge *e : edges)
             {
-                if (e->src == src && e->dest == dest || e->src == dest && e->dest == src)
+                if (e->src == src && e->dest == dest)
                 {
-                    edges.erase(remove(edges.begin(), edges.end(), e), edges.end());
                     this->distance -= e->distance;
+                    edges.erase(remove(edges.begin(), edges.end(), e), edges.end());
+                    // e->remove();
+                    break;
                 }
             }
+            src->next = nullptr;
+            dest->prev = nullptr;
         }
     }
 
@@ -233,34 +177,26 @@ public:
         return nullptr;
     }
 
-    // bool hasCycle()
-    // {
-    //     unordered_set<Vertex *> visited;
-    //     for (Vertex *v : vertices)
-    //     {
-    //         if (!visited.count(v) && hasCycleUtil(v, nullptr, visited))
-    //             return true;
-    //     }
-    //     return false;
-    // }
+    vector<Edge*> findPath(Vertex *start, Vertex *end)
+    {
+        vector<Edge*> path;
+        Vertex *currentVertex = start;
 
-    // bool hasCycleUtil(Vertex *v, Vertex *parent, unordered_set<Vertex *> &visited)
-    // {
-    //     visited.insert(v);
-    //     for (Vertex *neighbour : v->neighbours)
-    //     {
-    //         if (!visited.count(neighbour))
-    //         {
-    //             if (hasCycleUtil(neighbour, v, visited))
-    //                 return true;
-    //         }
-    //         else if (neighbour != parent)
-    //         {
-    //             return true;
-    //         }
-    //     }
-    //     return false;
-    // }
+        do
+        {
+            for (Edge *e : edges)
+            {
+                if (e->src == currentVertex)
+                {
+                    path.push_back(e);
+                    currentVertex = e->dest;
+                    break;
+                }
+            }
+        } while (currentVertex != end);
+
+        return path;
+    }
 };
 
 void saveGraphs(const vector<Graph> &graphs, const string &filename)
@@ -394,6 +330,7 @@ vector<Graph> greedyCycles(const vector<vector<int>> &distanceMatrix, int startI
 
         cycle.addVertex(nearestNeighbour);
         cycle.addEdge(vertex, nearestNeighbour, minDistance);
+        cycle.addEdge(nearestNeighbour, vertex);
         visited[nearestNeighbourId] = true;
     }
 
@@ -455,21 +392,23 @@ vector<Graph> greedyCycles(const vector<vector<int>> &distanceMatrix, int startI
 
         Vertex *newVertex = new Vertex(vertexId);
         cycle.addVertex(newVertex);
+
+        // if (cycle.vertices.size() > 3)
+        // {
+            cycle.removeEdge(minEdge->src, minEdge->dest);
+        // }
+
         cycle.addEdge(minEdge->src, newVertex, distanceMatrix[minEdge->src->id][vertexId]);
         cycle.addEdge(newVertex, minEdge->dest, distanceMatrix[newVertex->id][minEdge->dest->id]);
 
-        if (cycle.vertices.size() > 3)
+        if (cycle.vertices.size() == 3)
         {
-            cycle.removeEdge(minEdge->src, minEdge->dest);
+            cycle.addEdge(minEdge->dest, minEdge->src, minEdge->distance);
         }
 
         visited[vertexId] = true;
     }
 
-    for (Graph &cycle : cycles)
-    {
-        cycle.normalizeGraph();
-    }
     return cycles;
 }
 
@@ -481,30 +420,23 @@ void swapVerticesBetweenCycles(int i, int j, vector<Graph> &graphs, const vector
     Vertex *vertex1 = graph1->findVertex(i);
     Vertex *vertex2 = graph2->findVertex(j);
 
-    vector<Vertex *> neighbours1 = vertex1->neighbours;
-    vector<Vertex *> neighbours2 = vertex2->neighbours;
+    Vertex *vertex1Prev = vertex1->prev;
+    Vertex *vertex1Next = vertex1->next;
 
-    Vertex *vertex1Neighbour1 = neighbours1[0];
-    Vertex *vertex1Neighbour2 = neighbours1[1];
-
-    Vertex *vertex2Neighbour1 = neighbours2[0];
-    Vertex *vertex2Neighbour2 = neighbours2[1];
+    Vertex *vertex2Prev = vertex2->prev;
+    Vertex *vertex2Next = vertex2->next;
 
     graph1->removeVertex(vertex1);
-    graph1->removeEdge(vertex1Neighbour1, vertex1);
-    graph1->removeEdge(vertex1, vertex1Neighbour2);
 
     graph2->removeVertex(vertex2);
-    graph2->removeEdge(vertex2Neighbour1, vertex2);
-    graph2->removeEdge(vertex2, vertex2Neighbour2);
 
     graph1->addVertex(vertex2);
-    graph1->addEdge(vertex1Neighbour1, vertex2, distanceMatrix[vertex1Neighbour1->id][vertex2->id]);
-    graph1->addEdge(vertex2, vertex1Neighbour2, distanceMatrix[vertex2->id][vertex1Neighbour2->id]);
+    graph1->addEdge(vertex1Prev, vertex2, distanceMatrix[vertex1Prev->id][vertex2->id]);
+    graph1->addEdge(vertex2, vertex1Next, distanceMatrix[vertex2->id][vertex1Next->id]);
 
     graph2->addVertex(vertex1);
-    graph2->addEdge(vertex2Neighbour1, vertex1, distanceMatrix[vertex2Neighbour1->id][vertex1->id]);
-    graph2->addEdge(vertex1, vertex2Neighbour2, distanceMatrix[vertex1->id][vertex2Neighbour2->id]);
+    graph2->addEdge(vertex2Prev, vertex1, distanceMatrix[vertex2Prev->id][vertex1->id]);
+    graph2->addEdge(vertex1, vertex2Next, distanceMatrix[vertex1->id][vertex2Next->id]);
 }
 
 void swapVerticesInCycle(int i, int j, Graph &graph, const vector<vector<int>> &distanceMatrix)
@@ -512,65 +444,62 @@ void swapVerticesInCycle(int i, int j, Graph &graph, const vector<vector<int>> &
     Vertex *vertex1 = graph.findVertex(i);
     Vertex *vertex2 = graph.findVertex(j);
 
-    vector<Vertex *> neighbours1 = vertex1->neighbours;
-    vector<Vertex *> neighbours2 = vertex2->neighbours;
+    Vertex *vertex1Prev = vertex1->prev;
+    Vertex *vertex1Next = vertex1->next;
 
-    Vertex *vertex1Neighbour1 = neighbours1[0];
-    Vertex *vertex1Neighbour2 = neighbours1[1];
+    Vertex *vertex2Prev = vertex2->prev;
+    Vertex *vertex2Next = vertex2->next;
 
-    Vertex *vertex2Neighbour1 = neighbours2[0];
-    Vertex *vertex2Neighbour2 = neighbours2[1];
-
-    if (vertex1Neighbour1 == vertex2 || vertex1Neighbour2 == vertex2)
+    if (vertex1Prev == vertex2 || vertex1Next == vertex2)
     {
-        if (vertex1Neighbour1 == vertex2 && vertex2Neighbour1 == vertex1)
+        if (vertex1Prev == vertex2 && vertex2Prev == vertex1)
         {
-            graph.removeEdge(vertex1Neighbour2, vertex1);
-            graph.removeEdge(vertex2, vertex2Neighbour2);
+            graph.removeEdge(vertex1Next, vertex1);
+            graph.removeEdge(vertex2, vertex2Next);
 
-            graph.addEdge(vertex1, vertex2Neighbour2, distanceMatrix[vertex1->id][vertex2Neighbour2->id]);
-            graph.addEdge(vertex1Neighbour2, vertex2, distanceMatrix[vertex1Neighbour2->id][vertex2->id]);
+            graph.addEdge(vertex1, vertex2Next, distanceMatrix[vertex1->id][vertex2Next->id]);
+            graph.addEdge(vertex1Next, vertex2, distanceMatrix[vertex1Next->id][vertex2->id]);
         }
-        else if (vertex1Neighbour2 == vertex2 && vertex2Neighbour1 == vertex1)
+        else if (vertex1Next == vertex2 && vertex2Prev == vertex1)
         {
-            graph.removeEdge(vertex1Neighbour1, vertex1);
-            graph.removeEdge(vertex2, vertex2Neighbour2);
+            graph.removeEdge(vertex1Prev, vertex1);
+            graph.removeEdge(vertex2, vertex2Next);
 
-            graph.addEdge(vertex1, vertex2Neighbour2, distanceMatrix[vertex1->id][vertex2Neighbour2->id]);
-            graph.addEdge(vertex1Neighbour1, vertex2, distanceMatrix[vertex1Neighbour1->id][vertex2->id]);
+            graph.addEdge(vertex1, vertex2Next, distanceMatrix[vertex1->id][vertex2Next->id]);
+            graph.addEdge(vertex1Prev, vertex2, distanceMatrix[vertex1Prev->id][vertex2->id]);
         }
-        else if (vertex1Neighbour1 == vertex2 && vertex2Neighbour2 == vertex1)
+        else if (vertex1Prev == vertex2 && vertex2Next == vertex1)
         {
-            graph.removeEdge(vertex1Neighbour2, vertex1);
-            graph.removeEdge(vertex2Neighbour1, vertex2);
+            graph.removeEdge(vertex1Next, vertex1);
+            graph.removeEdge(vertex2Prev, vertex2);
 
-            graph.addEdge(vertex1, vertex2Neighbour1, distanceMatrix[vertex1->id][vertex2Neighbour1->id]);
-            graph.addEdge(vertex1Neighbour2, vertex2, distanceMatrix[vertex1Neighbour2->id][vertex2->id]);
+            graph.addEdge(vertex1, vertex2Prev, distanceMatrix[vertex1->id][vertex2Prev->id]);
+            graph.addEdge(vertex1Next, vertex2, distanceMatrix[vertex1Next->id][vertex2->id]);
         }
-        else if (vertex1Neighbour2 == vertex2 && vertex2Neighbour2 == vertex1)
+        else if (vertex1Next == vertex2 && vertex2Next == vertex1)
         {
-            graph.removeEdge(vertex1Neighbour1, vertex1);
-            graph.removeEdge(vertex2Neighbour1, vertex2);
+            graph.removeEdge(vertex1Prev, vertex1);
+            graph.removeEdge(vertex2Prev, vertex2);
 
-            graph.addEdge(vertex1, vertex2Neighbour1, distanceMatrix[vertex1->id][vertex2Neighbour1->id]);
-            graph.addEdge(vertex1Neighbour1, vertex2, distanceMatrix[vertex1Neighbour1->id][vertex2->id]);
+            graph.addEdge(vertex1, vertex2Prev, distanceMatrix[vertex1->id][vertex2Prev->id]);
+            graph.addEdge(vertex1Prev, vertex2, distanceMatrix[vertex1Prev->id][vertex2->id]);
         }
     }
     else
     {
-        graph.removeEdge(vertex1Neighbour1, vertex1);
-        graph.removeEdge(vertex1, vertex1Neighbour2);
-        graph.removeEdge(vertex2Neighbour1, vertex2);
-        graph.removeEdge(vertex2, vertex2Neighbour2);
+        graph.removeEdge(vertex1Prev, vertex1);
+        graph.removeEdge(vertex1, vertex1Next);
+        graph.removeEdge(vertex2Prev, vertex2);
+        graph.removeEdge(vertex2, vertex2Next);
 
-        graph.addEdge(vertex1Neighbour1, vertex2, distanceMatrix[vertex1Neighbour1->id][vertex2->id]);
-        graph.addEdge(vertex2, vertex1Neighbour2, distanceMatrix[vertex2->id][vertex1Neighbour2->id]);
-        graph.addEdge(vertex2Neighbour1, vertex1, distanceMatrix[vertex2Neighbour1->id][vertex1->id]);
-        graph.addEdge(vertex1, vertex2Neighbour2, distanceMatrix[vertex1->id][vertex2Neighbour2->id]);
+        graph.addEdge(vertex1Prev, vertex2, distanceMatrix[vertex1Prev->id][vertex2->id]);
+        graph.addEdge(vertex2, vertex1Next, distanceMatrix[vertex2->id][vertex1Next->id]);
+        graph.addEdge(vertex2Prev, vertex1, distanceMatrix[vertex2Prev->id][vertex1->id]);
+        graph.addEdge(vertex1, vertex2Next, distanceMatrix[vertex1->id][vertex2Next->id]);
     }
 }
 
-vector<Graph> steepyLocalSearchNeighbourhood1(vector<Graph> &cycles, const vector<vector<int>> &distanceMatrix)
+vector<Graph> steepestLocalSearchNeighbourhood1(vector<Graph> &cycles, const vector<vector<int>> &distanceMatrix)
 {
     int bestDelta = 0;
     
@@ -613,28 +542,28 @@ vector<Graph> steepyLocalSearchNeighbourhood1(vector<Graph> &cycles, const vecto
 
             int delta = 0;
 
-            if (vertex1->neighbours[0] == vertex2 || vertex1->neighbours[1] == vertex2)
+            if (vertex1->prev == vertex2 || vertex1->next == vertex2)
             {
-                if (vertex1->neighbours[0] == vertex2 && vertex2->neighbours[0] == vertex1)
+                if (vertex1->prev == vertex2 && vertex2->prev == vertex1)
                 {
-                    delta = distanceMatrix[vertex1->neighbours[1]->id][vertex2->id] + distanceMatrix[vertex2->neighbours[1]->id][vertex1->id] - distanceMatrix[vertex1->neighbours[1]->id][vertex1->id] - distanceMatrix[vertex2->neighbours[1]->id][vertex2->id];
+                    delta = distanceMatrix[vertex1->next->id][vertex2->id] + distanceMatrix[vertex2->next->id][vertex1->id] - distanceMatrix[vertex1->next->id][vertex1->id] - distanceMatrix[vertex2->next->id][vertex2->id];
                 }
-                else if (vertex1->neighbours[1] == vertex2 && vertex2->neighbours[1] == vertex1)
+                else if (vertex1->next == vertex2 && vertex2->next == vertex1)
                 {
-                    delta = distanceMatrix[vertex1->neighbours[0]->id][vertex2->id] + distanceMatrix[vertex2->neighbours[0]->id][vertex1->id] - distanceMatrix[vertex1->neighbours[0]->id][vertex1->id] - distanceMatrix[vertex2->neighbours[0]->id][vertex2->id];
+                    delta = distanceMatrix[vertex1->prev->id][vertex2->id] + distanceMatrix[vertex2->prev->id][vertex1->id] - distanceMatrix[vertex1->prev->id][vertex1->id] - distanceMatrix[vertex2->prev->id][vertex2->id];
                 }
-                else if (vertex1->neighbours[0] == vertex2 && vertex2->neighbours[1] == vertex1)
+                else if (vertex1->prev == vertex2 && vertex2->next == vertex1)
                 {
-                    delta = distanceMatrix[vertex1->neighbours[1]->id][vertex2->id] + distanceMatrix[vertex2->neighbours[0]->id][vertex1->id] - distanceMatrix[vertex1->neighbours[1]->id][vertex1->id] - distanceMatrix[vertex2->neighbours[0]->id][vertex2->id];
+                    delta = distanceMatrix[vertex1->next->id][vertex2->id] + distanceMatrix[vertex2->prev->id][vertex1->id] - distanceMatrix[vertex1->next->id][vertex1->id] - distanceMatrix[vertex2->prev->id][vertex2->id];
                 }
-                else if (vertex1->neighbours[1] == vertex2 && vertex2->neighbours[0] == vertex1)
+                else if (vertex1->next == vertex2 && vertex2->prev == vertex1)
                 {
-                    delta = distanceMatrix[vertex1->neighbours[0]->id][vertex2->id] + distanceMatrix[vertex2->neighbours[1]->id][vertex1->id] - distanceMatrix[vertex1->neighbours[0]->id][vertex1->id] - distanceMatrix[vertex2->neighbours[1]->id][vertex2->id];
+                    delta = distanceMatrix[vertex1->prev->id][vertex2->id] + distanceMatrix[vertex2->next->id][vertex1->id] - distanceMatrix[vertex1->prev->id][vertex1->id] - distanceMatrix[vertex2->next->id][vertex2->id];
                 }
             }
             else
             {
-                delta = distanceMatrix[vertex1->neighbours[0]->id][vertex2->id] + distanceMatrix[vertex2->id][vertex1->neighbours[1]->id] + distanceMatrix[vertex2->neighbours[0]->id][vertex1->id] + distanceMatrix[vertex1->id][vertex2->neighbours[1]->id] - distanceMatrix[vertex1->neighbours[0]->id][vertex1->id] - distanceMatrix[vertex1->id][vertex1->neighbours[1]->id] - distanceMatrix[vertex2->neighbours[0]->id][vertex2->id] - distanceMatrix[vertex2->id][vertex2->neighbours[1]->id];
+                delta = distanceMatrix[vertex1->prev->id][vertex2->id] + distanceMatrix[vertex2->id][vertex1->next->id] + distanceMatrix[vertex2->prev->id][vertex1->id] + distanceMatrix[vertex1->id][vertex2->next->id] - distanceMatrix[vertex1->prev->id][vertex1->id] - distanceMatrix[vertex1->id][vertex1->next->id] - distanceMatrix[vertex2->prev->id][vertex2->id] - distanceMatrix[vertex2->id][vertex2->next->id];
             }
 
             if (delta < bestDelta)
@@ -657,11 +586,6 @@ vector<Graph> steepyLocalSearchNeighbourhood1(vector<Graph> &cycles, const vecto
             else
             {
                 swapVerticesInCycle(vertex1->id, vertex2->id, *graphToSwap, distanceMatrix);
-            }
-
-            for(Graph &cycle : cycles)
-            {
-                cycle.normalizeGraph();
             }
         }
     } while(bestDelta < 0);
@@ -709,25 +633,25 @@ vector<Graph> greedyLocalSearchNeighbourhood1(vector<Graph> &cycles, const vecto
 
             delta = 0;
 
-            if (vertex1->neighbours[0] == vertex2 && vertex2->neighbours[0] == vertex1)
+            if (vertex1->prev == vertex2 && vertex2->prev == vertex1)
             {
-                delta = distanceMatrix[vertex1->neighbours[1]->id][vertex2->id] + distanceMatrix[vertex2->neighbours[1]->id][vertex1->id] - distanceMatrix[vertex1->neighbours[1]->id][vertex1->id] - distanceMatrix[vertex2->neighbours[1]->id][vertex2->id];
+                delta = distanceMatrix[vertex1->next->id][vertex2->id] + distanceMatrix[vertex2->next->id][vertex1->id] - distanceMatrix[vertex1->next->id][vertex1->id] - distanceMatrix[vertex2->next->id][vertex2->id];
             }
-            else if (vertex1->neighbours[1] == vertex2 && vertex2->neighbours[1] == vertex1)
+            else if (vertex1->next == vertex2 && vertex2->next == vertex1)
             {
-                delta = distanceMatrix[vertex1->neighbours[0]->id][vertex2->id] + distanceMatrix[vertex2->neighbours[0]->id][vertex1->id] - distanceMatrix[vertex1->neighbours[0]->id][vertex1->id] - distanceMatrix[vertex2->neighbours[0]->id][vertex2->id];
+                delta = distanceMatrix[vertex1->prev->id][vertex2->id] + distanceMatrix[vertex2->prev->id][vertex1->id] - distanceMatrix[vertex1->prev->id][vertex1->id] - distanceMatrix[vertex2->prev->id][vertex2->id];
             }
-            else if (vertex1->neighbours[0] == vertex2 && vertex2->neighbours[1] == vertex1)
+            else if (vertex1->prev == vertex2 && vertex2->next == vertex1)
             {
-                delta = distanceMatrix[vertex1->neighbours[1]->id][vertex2->id] + distanceMatrix[vertex2->neighbours[0]->id][vertex1->id] - distanceMatrix[vertex1->neighbours[1]->id][vertex1->id] - distanceMatrix[vertex2->neighbours[0]->id][vertex2->id];
+                delta = distanceMatrix[vertex1->next->id][vertex2->id] + distanceMatrix[vertex2->prev->id][vertex1->id] - distanceMatrix[vertex1->next->id][vertex1->id] - distanceMatrix[vertex2->prev->id][vertex2->id];
             }
-            else if (vertex1->neighbours[1] == vertex2 && vertex2->neighbours[0] == vertex1)
+            else if (vertex1->next == vertex2 && vertex2->prev == vertex1)
             {
-                delta = distanceMatrix[vertex1->neighbours[0]->id][vertex2->id] + distanceMatrix[vertex2->neighbours[1]->id][vertex1->id] - distanceMatrix[vertex1->neighbours[0]->id][vertex1->id] - distanceMatrix[vertex2->neighbours[1]->id][vertex2->id];
+                delta = distanceMatrix[vertex1->prev->id][vertex2->id] + distanceMatrix[vertex2->next->id][vertex1->id] - distanceMatrix[vertex1->prev->id][vertex1->id] - distanceMatrix[vertex2->next->id][vertex2->id];
             }
             else
             {
-                delta = distanceMatrix[vertex1->neighbours[0]->id][vertex2->id] + distanceMatrix[vertex2->id][vertex1->neighbours[1]->id] + distanceMatrix[vertex2->neighbours[0]->id][vertex1->id] + distanceMatrix[vertex1->id][vertex2->neighbours[1]->id] - distanceMatrix[vertex1->neighbours[0]->id][vertex1->id] - distanceMatrix[vertex1->id][vertex1->neighbours[1]->id] - distanceMatrix[vertex2->neighbours[0]->id][vertex2->id] - distanceMatrix[vertex2->id][vertex2->neighbours[1]->id];
+                delta = distanceMatrix[vertex1->prev->id][vertex2->id] + distanceMatrix[vertex2->id][vertex1->next->id] + distanceMatrix[vertex2->prev->id][vertex1->id] + distanceMatrix[vertex1->id][vertex2->next->id] - distanceMatrix[vertex1->prev->id][vertex1->id] - distanceMatrix[vertex1->id][vertex1->next->id] - distanceMatrix[vertex2->prev->id][vertex2->id] - distanceMatrix[vertex2->id][vertex2->next->id];
             }
 
             if (delta < 0)
@@ -745,11 +669,6 @@ vector<Graph> greedyLocalSearchNeighbourhood1(vector<Graph> &cycles, const vecto
                     swapVerticesInCycle(vertex1->id, vertex2->id, *graphToSwap, distanceMatrix);
                 }
 
-                for(Graph &cycle : cycles)
-                {
-                    cycle.normalizeGraph();
-                }
-
                 break;
             }
         }
@@ -758,9 +677,11 @@ vector<Graph> greedyLocalSearchNeighbourhood1(vector<Graph> &cycles, const vecto
     return cycles;
 }
 
-vector<Graph> steepyLocalSearchNeighbourhood2(vector<Graph> &cycles, const vector<vector<int>> &distanceMatrix)
+vector<Graph> steepestLocalSearchNeighbourhood2(vector<Graph> &cycles, const vector<vector<int>> &distanceMatrix)
 {
     int bestDelta = 0;
+
+    int i = 0;
 
     do
     {
@@ -782,17 +703,19 @@ vector<Graph> steepyLocalSearchNeighbourhood2(vector<Graph> &cycles, const vecto
                 {
                     if (edge1 != edge2)
                     {
-                        if (edge1->src != edge2->dest && edge1->dest == edge2->src)
+                        Vertex *vertex11 = edge1->src;
+                        Vertex *vertex12 = edge1->dest;
+                        Vertex *vertex21 = edge2->src;
+                        Vertex *vertex22 = edge2->dest;
+
+                        if (vertex11->id != vertex12->id && vertex11->id != vertex21->id && vertex11->id != vertex22->id && vertex12->id != vertex21->id && vertex12->id != vertex22->id && vertex21->id != vertex22->id)
                         {
-                            moves.push_back(make_pair(make_pair(edge1, edge2), &graph));
                             moves.push_back(make_pair(make_pair(edge1, edge2), &graph));
                         }
                     }
                 }
             }
         }
-
-        // random_shuffle(moves.begin(), moves.end());
 
         pair<variant<pair<Vertex *, Vertex *>, pair<Edge *, Edge *>>, Graph *> bestMove;
 
@@ -806,9 +729,8 @@ vector<Graph> steepyLocalSearchNeighbourhood2(vector<Graph> &cycles, const vecto
             {
                 Vertex *vertex1 = get<0>(move.first).first;
                 Vertex *vertex2 = get<0>(move.first).second;
-                Graph *graphToSwap = move.second;
 
-                delta = distanceMatrix[vertex1->neighbours[0]->id][vertex2->id] + distanceMatrix[vertex2->id][vertex1->neighbours[1]->id] + distanceMatrix[vertex2->neighbours[0]->id][vertex1->id] + distanceMatrix[vertex1->id][vertex2->neighbours[1]->id] - distanceMatrix[vertex1->neighbours[0]->id][vertex1->id] - distanceMatrix[vertex1->id][vertex1->neighbours[1]->id] - distanceMatrix[vertex2->neighbours[0]->id][vertex2->id] - distanceMatrix[vertex2->id][vertex2->neighbours[1]->id];
+                delta = distanceMatrix[vertex1->prev->id][vertex2->id] + distanceMatrix[vertex2->id][vertex1->next->id] + distanceMatrix[vertex2->prev->id][vertex1->id] + distanceMatrix[vertex1->id][vertex2->next->id] - distanceMatrix[vertex1->prev->id][vertex1->id] - distanceMatrix[vertex1->id][vertex1->next->id] - distanceMatrix[vertex2->prev->id][vertex2->id] - distanceMatrix[vertex2->id][vertex2->next->id];
             }
             else
             {
@@ -855,16 +777,25 @@ vector<Graph> steepyLocalSearchNeighbourhood2(vector<Graph> &cycles, const vecto
                 graphToSwap->removeEdge(vertex11, vertex12);
                 graphToSwap->removeEdge(vertex21, vertex22);
 
+                vector <Edge*> pathToReverse = graphToSwap->findPath(vertex12, vertex21);
+
+                for(Edge *edge: pathToReverse){
+                    swap(edge->src, edge->dest);
+                    swap(edge->dest->next, edge->dest->prev);
+                    if(edge->src->next == nullptr){
+                        swap(edge->src->next, edge->src->prev);
+                    }
+                }
+
                 graphToSwap->addEdge(vertex11, vertex21, distanceMatrix[vertex11->id][vertex21->id]);
                 graphToSwap->addEdge(vertex12, vertex22, distanceMatrix[vertex12->id][vertex22->id]);
             }
 
-            for(Graph &cycle : cycles)
-            {
-                cycle.normalizeGraph();
-            }
         }
-    }while(bestDelta < 0);
+
+        i++;
+    }
+    while(bestDelta < 0);
 
     return cycles;
 }
@@ -892,9 +823,13 @@ vector<Graph> greedyLocalSearchNeighbourhood2(vector<Graph> &cycles, const vecto
                 {
                     if (edge1 != edge2)
                     {
-                        if (edge1->src != edge2->dest && edge1->dest == edge2->src)
+                        Vertex *vertex11 = edge1->src;
+                        Vertex *vertex12 = edge1->dest;
+                        Vertex *vertex21 = edge2->src;
+                        Vertex *vertex22 = edge2->dest;
+
+                        if (vertex11->id != vertex12->id && vertex11->id != vertex21->id && vertex11->id != vertex22->id && vertex12->id != vertex21->id && vertex12->id != vertex22->id && vertex21->id != vertex22->id)
                         {
-                            moves.push_back(make_pair(make_pair(edge1, edge2), &graph));
                             moves.push_back(make_pair(make_pair(edge1, edge2), &graph));
                         }
                     }
@@ -914,7 +849,7 @@ vector<Graph> greedyLocalSearchNeighbourhood2(vector<Graph> &cycles, const vecto
                 Vertex *vertex2 = get<0>(move.first).second;
                 Graph *graphToSwap = move.second;
 
-                delta = distanceMatrix[vertex1->neighbours[0]->id][vertex2->id] + distanceMatrix[vertex2->id][vertex1->neighbours[1]->id] + distanceMatrix[vertex2->neighbours[0]->id][vertex1->id] + distanceMatrix[vertex1->id][vertex2->neighbours[1]->id] - distanceMatrix[vertex1->neighbours[0]->id][vertex1->id] - distanceMatrix[vertex1->id][vertex1->neighbours[1]->id] - distanceMatrix[vertex2->neighbours[0]->id][vertex2->id] - distanceMatrix[vertex2->id][vertex2->neighbours[1]->id];
+                delta = distanceMatrix[vertex1->prev->id][vertex2->id] + distanceMatrix[vertex2->id][vertex1->next->id] + distanceMatrix[vertex2->prev->id][vertex1->id] + distanceMatrix[vertex1->id][vertex2->next->id] - distanceMatrix[vertex1->prev->id][vertex1->id] - distanceMatrix[vertex1->id][vertex1->next->id] - distanceMatrix[vertex2->prev->id][vertex2->id] - distanceMatrix[vertex2->id][vertex2->next->id];
             }
             else
             {
@@ -954,13 +889,18 @@ vector<Graph> greedyLocalSearchNeighbourhood2(vector<Graph> &cycles, const vecto
                     graphToSwap->removeEdge(vertex11, vertex12);
                     graphToSwap->removeEdge(vertex21, vertex22);
 
+                    vector <Edge*> pathToReverse = graphToSwap->findPath(vertex12, vertex21);
+
+                    for(Edge *edge: pathToReverse){
+                        swap(edge->src, edge->dest);
+                        swap(edge->dest->next, edge->dest->prev);
+                        if(edge->src->next == nullptr){
+                            swap(edge->src->next, edge->src->prev);
+                        }
+                    }
+
                     graphToSwap->addEdge(vertex11, vertex21, distanceMatrix[vertex11->id][vertex21->id]);
                     graphToSwap->addEdge(vertex12, vertex22, distanceMatrix[vertex12->id][vertex22->id]);
-                }
-
-                for(Graph &cycle : cycles)
-                {
-                    cycle.normalizeGraph();
                 }
 
                 break;
@@ -1021,11 +961,6 @@ vector<Graph> randomWalkNeighbourhood1(vector<Graph> &cycles, const vector<vecto
             bestCycles = cycles;
         }
 
-        for(Graph &cycle : cycles)
-        {
-            cycle.normalizeGraph();
-        }
-
     }
 
     return bestCycles;
@@ -1054,9 +989,13 @@ vector<Graph> randomWalkNeighbourhood2(vector<Graph> &cycles, const vector<vecto
                 {
                     if (edge1 != edge2)
                     {
-                        if (edge1->src != edge2->dest && edge1->dest == edge2->src)
+                        Vertex *vertex11 = edge1->src;
+                        Vertex *vertex12 = edge1->dest;
+                        Vertex *vertex21 = edge2->src;
+                        Vertex *vertex22 = edge2->dest;
+
+                        if (vertex11->id != vertex12->id && vertex11->id != vertex21->id && vertex11->id != vertex22->id && vertex12->id != vertex21->id && vertex12->id != vertex22->id && vertex21->id != vertex22->id)
                         {
-                            moves.push_back(make_pair(make_pair(edge1, edge2), &graph));
                             moves.push_back(make_pair(make_pair(edge1, edge2), &graph));
                         }
                     }
@@ -1090,13 +1029,18 @@ vector<Graph> randomWalkNeighbourhood2(vector<Graph> &cycles, const vector<vecto
             graphToSwap->removeEdge(vertex11, vertex12);
             graphToSwap->removeEdge(vertex21, vertex22);
 
+            vector <Edge*> pathToReverse = graphToSwap->findPath(vertex12, vertex21);
+
+            for(Edge *edge: pathToReverse){
+                swap(edge->src, edge->dest);
+                swap(edge->dest->next, edge->dest->prev);
+                if(edge->src->next == nullptr){
+                    swap(edge->src->next, edge->src->prev);
+                }
+            }
+
             graphToSwap->addEdge(vertex11, vertex21, distanceMatrix[vertex11->id][vertex21->id]);
             graphToSwap->addEdge(vertex12, vertex22, distanceMatrix[vertex12->id][vertex22->id]);
-        }
-
-        for(Graph &cycle : cycles)
-        {
-            cycle.normalizeGraph();
         }
 
         if(cycles[0].distance + cycles[1].distance < bestCycles[0].distance + bestCycles[1].distance)
@@ -1143,13 +1087,9 @@ int main()
 
         vector<Graph> randomCyclesStart = randomCycles(distanceMatrix);
 
-        vector<Graph> randomCyclesResult = randomWalkNeighbourhood2(randomCyclesStart, distanceMatrix);
+        vector<Graph> randomCyclesResult = steepestLocalSearchNeighbourhood2(randomCyclesStart, distanceMatrix);
 
         chrono::steady_clock::time_point endRandomCycles = chrono::steady_clock::now();
-
-        // for(Edge *e : randomCyclesResult[0].edges){
-        //     cout << e->src->id << " " << e->dest->id << endl;
-        // }
 
         int elapsedRandomCycles = chrono::duration_cast<chrono::milliseconds>(endRandomCycles - beginRandomCycles).count();
 
@@ -1182,7 +1122,14 @@ int main()
 
         vector<Graph> greedyCyclesStart = greedyCycles(distanceMatrix, i);
 
-        vector<Graph> greedyCyclesResult = randomWalkNeighbourhood2(greedyCyclesStart, distanceMatrix);
+        // for(Graph &graph: greedyCyclesStart){
+        //     for(Edge *edge: graph.edges){
+        //         cout << edge->src->id << " " << edge->dest->id << endl;
+        //     }
+        //     cout << endl;
+        // }
+
+        vector<Graph> greedyCyclesResult = steepestLocalSearchNeighbourhood2(greedyCyclesStart, distanceMatrix);
 
         chrono::steady_clock::time_point endGreedyCycles = chrono::steady_clock::now();
 
@@ -1219,7 +1166,7 @@ int main()
     averageRandomTime /= 100;
     averageGreedyTime /= 100;
 
-    cout << "greedyLocalSearchNeighbourhood2" << endl;
+    cout << "SteepestLocalSearchNeighbourhood2" << endl;
 
     cout << "RandomCycles" << endl;
     cout << averageRandomValue << " (" << bestRandomValue.first << " – " << worstRandomValue.first << ")" << endl;
@@ -1229,8 +1176,8 @@ int main()
     cout << averageGreedyValue << " (" << bestGreedyValue.first << " – " << worstGreedyValue.first << ")" << endl;
     cout << averageGreedyTime << " (" << bestGreedyTime.first << " – " << worstGreedyTime.first << ")" << endl;
 
-    saveGraphs(bestRandomCyclesResult, "randomWalkNeighbourhood2RandomCyclesB.txt");
-    saveGraphs(bestGreedyCyclesResult, "randomWalkNeighbourhood2GreedyCyclesB.txt");
+    // saveGraphs(bestRandomCyclesResult, "randomWalkNeighbourhood2RandomCyclesB.txt");
+    // saveGraphs(bestGreedyCyclesResult, "randomWalkNeighbourhood2GreedyCyclesB.txt");
 
     return 0;
 }
